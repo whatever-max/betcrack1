@@ -20,27 +20,33 @@ class _LoginScreenState extends State<LoginScreen> {
   final _auth = AuthService();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-  final _supabase = Supabase.instance.client; // Supabase client for querying profiles
+  final _supabase = Supabase.instance.client;
+  final _formKey = GlobalKey<FormState>(); // For form validation
 
   bool _isLoading = false;
 
   Future<String?> _fetchUserRoleFromProfile(String userId) async {
+    // ... (no changes here) ...
     try {
       final response = await _supabase
           .from('profiles')
           .select('role')
           .eq('id', userId)
-          .single(); // Assuming 'id' in profiles is the user_id and is unique
-
+          .single();
       return response['role'] as String?;
     } catch (e) {
       print("Error fetching role from profile: $e");
-      Fluttertoast.showToast(msg: "Could not verify user role. Please try again.");
-      return null; // Return null on error
+      if (mounted) {
+        Fluttertoast.showToast(msg: "Could not verify user role.");
+      }
+      return null;
     }
   }
 
   Future<void> _login() async {
+    if (!_formKey.currentState!.validate()) { // Validate the form
+      return;
+    }
     if (_isLoading) return;
     setState(() => _isLoading = true);
 
@@ -52,95 +58,140 @@ class _LoginScreenState extends State<LoginScreen> {
       final User? user = res.user;
 
       if (user != null) {
-        print("User login successful. User ID: ${user.id}");
-
-        // Fetch role from profiles table
         final String? userRole = await _fetchUserRoleFromProfile(user.id);
-        print("Role from profiles table: $userRole");
-
-        if (!mounted) {
-          if (_isLoading) setState(() => _isLoading = false);
-          return;
-        }
-
-        setState(() => _isLoading = false); // Reset loading state AFTER role fetch
+        if (!mounted) return;
 
         if (userRole == 'super_admin') {
-          print("Redirecting to AdminPanelScreen because role is '$userRole'");
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(builder: (_) => const AdminPanelScreen()),
           );
-        } else if (userRole != null) { // User has a role, but not super_admin
-          print("Redirecting to HomeScreen because role is '$userRole'");
+        } else if (userRole != null) {
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(builder: (_) => const HomeScreen()),
           );
         } else {
-          // Role could not be fetched or is null in profiles table
-          print("Role not found or error fetching role. Redirecting to HomeScreen by default.");
-          Fluttertoast.showToast(msg: "Could not determine user role. Please contact support if this persists.");
+          Fluttertoast.showToast(msg: "Role not found. Defaulting to Home.");
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(builder: (_) => const HomeScreen()),
           );
         }
-
       } else {
-        // user is null from _auth.signIn
-        if (mounted) setState(() => _isLoading = false);
-        Fluttertoast.showToast(msg: "Login failed: User not found or invalid credentials.");
+        if (mounted) {
+          Fluttertoast.showToast(msg: "Login failed: User not found or invalid credentials.");
+        }
       }
     } on AuthException catch (e) {
-      print("AuthException during login: ${e.message}");
-      if (mounted) setState(() => _isLoading = false);
-      Fluttertoast.showToast(msg: "Login error: ${e.message}");
+      if (mounted) {
+        Fluttertoast.showToast(msg: "Login error: ${e.message}");
+      }
     } catch (e, s) {
-      print("Unexpected error during login: $e");
-      print("Stack trace: $s");
-      if (mounted) setState(() => _isLoading = false);
-      Fluttertoast.showToast(msg: "An unexpected error occurred: ${e.toString()}");
+      print("Unexpected error during login: $e\n$s");
+      if (mounted) {
+        Fluttertoast.showToast(msg: "An unexpected error occurred.");
+      }
     } finally {
-      if (mounted && _isLoading) {
+      if (mounted) {
         setState(() => _isLoading = false);
       }
     }
   }
 
   @override
+  void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
       body: Center(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text("Log In", style: Theme.of(context).textTheme.headlineMedium),
-              const SizedBox(height: 24),
-              CustomInput(controller: _emailController, hint: "Email"),
-              CustomInput(
+          padding: const EdgeInsets.all(24.0),
+          child: Form( // Added Form widget
+            key: _formKey,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  "Welcome Back!",
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.headlineMedium?.copyWith(
+                      color: theme.colorScheme.primary,
+                      fontWeight: FontWeight.bold),
+                ),
+                Text(
+                  "Log in to your BetCrack account",
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.bodyMedium,
+                ),
+                const SizedBox(height: 32),
+                CustomInput(
+                  controller: _emailController,
+                  hintText: "Enter your email", // UPDATED: hint -> hintText
+                  labelText: "Email",
+                  keyboardType: TextInputType.emailAddress,
+                  prefixIcon: Icons.email_outlined,
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Please enter your email';
+                    }
+                    if (!value.contains('@') || !value.contains('.')) {
+                      return 'Please enter a valid email';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+                CustomInput(
                   controller: _passwordController,
-                  hint: "Password",
-                  isPassword: true),
-              const SizedBox(height: 16),
-              CustomButton(
-                  label: "Log In", loading: _isLoading, onPressed: _login),
-              const SizedBox(height: 12),
-              TextButton(
-                onPressed: _isLoading
-                    ? null
-                    : () => Navigator.pushReplacement(
-                    context,
-                    MaterialPageRoute(
-                        builder: (_) => const SignupScreen())),
-                child: const Text("Don't have an account? Sign up"),
-              )
-            ],
+                  hintText: "Enter your password", // UPDATED: hint -> hintText
+                  labelText: "Password",
+                  obscureText: true, // UPDATED: isPassword -> obscureText
+                  prefixIcon: Icons.lock_outline,
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Please enter your password';
+                    }
+                    if (value.length < 6) {
+                      return 'Password must be at least 6 characters';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 24),
+                CustomButton(
+                  label: "Log In",
+                  onPressed: _login,
+                  isLoading: _isLoading, // UPDATED: loading -> isLoading
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text("Don't have an account?", style: theme.textTheme.bodyMedium),
+                    CustomButton( // Using CustomButton for text button style
+                      label: "Sign Up",
+                      onPressed: _isLoading ? null : () => Navigator.pushReplacement(
+                        context,
+                        MaterialPageRoute(builder: (_) => const SignupScreen()),
+                      ),
+                      type: CustomButtonType.text, // Specify type
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
       ),
     );
   }
 }
+
