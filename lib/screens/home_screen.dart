@@ -5,13 +5,13 @@ import 'package:intl/intl.dart';
 import '../models/betslip.dart';
 import '../widgets/betslip_card.dart';
 import '../services/auth_service.dart';
-// import 'login_screen.dart'; // Not directly needed for navigation from here
-// import '../admin/app_management_screen.dart'; // Not directly needed
+// import 'login_screen.dart'; // Handled by main.dart or auth state listeners
+// import '../admin/app_management_screen.dart'; // Handled by main.dart or drawer
 import 'payment_methods_screen.dart';
 import 'betslip_detail_screen.dart';
 import '../widgets/app_drawer.dart';
 import 'payment_history_screen.dart';
-// TODO: Import SettingsScreen if you create it
+import 'premium_slips_screen.dart'; // For navigating to premium packages
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -29,8 +29,8 @@ class _HomeScreenState extends State<HomeScreen> {
   String? _phone;
   String? _userRole;
 
-  List<Betslip>? _allBetslips;
-  List<Betslip>? _filteredBetslips;
+  List<Betslip>? _allBetslips; // Contains ALL slips initially
+  List<Betslip>? _filteredRegularSlips; // For the main feed (non-premium only)
   Map<String, bool> _purchaseStatus = {};
 
   bool _isLoadingProfile = true;
@@ -46,28 +46,13 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    // print("[HomeScreen initState] Initializing HomeScreen. Current route: ${ModalRoute.of(context)?.settings.name}"); // <<<--- REMOVED/COMMENTED THIS LINE
-    print("[HomeScreen initState] Initializing HomeScreen."); // Safe print
+    print("[HomeScreen initState] Initializing HomeScreen.");
     _generateFilterDates();
     _fetchInitialData();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      // Access ModalRoute here if needed for the first frame actions, though _scrollToSelectedDate doesn't use it.
-      // print("[HomeScreen initState - postFrame] Current route: ${ModalRoute.of(context)?.settings.name}");
       if (mounted) _scrollToSelectedDate(isInitialLoad: true);
     });
   }
-
-  // If you need to react to route changes or access ModalRoute early after initState:
-  // bool _isFirstDidChangeDependencies = true;
-  // @override
-  // void didChangeDependencies() {
-  //   super.didChangeDependencies();
-  //   if (_isFirstDidChangeDependencies) {
-  //     _isFirstDidChangeDependencies = false;
-  //     // It's safe to use ModalRoute.of(context) here.
-  //     print("[HomeScreen didChangeDependencies] Initial call. Current route: ${ModalRoute.of(context)?.settings.name}");
-  //   }
-  // }
 
   @override
   void dispose() {
@@ -108,28 +93,22 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _fetchInitialData() async {
-    // You can access ModalRoute here if needed for logic within this method
-    // print("[HomeScreen _fetchInitialData] START. Current route: ${ModalRoute.of(context)?.settings.name}");
     await _fetchProfile();
     if (!mounted) return;
 
     if (_userRole == 'super_admin' && ModalRoute.of(context)?.settings.name != '/home') {
       print("[HomeScreen _fetchInitialData] Admin detected, but current route is not /home ('${ModalRoute.of(context)?.settings.name}'). Skipping further data load for this instance.");
-      if (mounted) {
-        setState(() { _isLoadingBetslips = false; _isLoadingPurchases = false; });
-      }
+      if (mounted) setState(() { _isLoadingBetslips = false; _isLoadingPurchases = false; });
       return;
     }
-    print("[HomeScreen _fetchInitialData] Proceeding. Role: $_userRole, Route: ${ModalRoute.of(context)?.settings.name}");
+    print("[HomeScreen _fetchInitialData] Proceeding to load user purchases and betslips. Role: $_userRole, Route: ${ModalRoute.of(context)?.settings.name}");
     await _fetchUserPurchases();
-    await _fetchBetslips();
+    await _fetchBetslips(); // Fetches all types of betslips
   }
 
   Future<void> _fetchProfile() async {
     if (!mounted) return;
     setState(() => _isLoadingProfile = true);
-    // You can access ModalRoute.of(context).settings.name here too
-    // print("[HomeScreen _fetchProfile] START. Current route: ${ModalRoute.of(context)?.settings.name}");
     try {
       final user = _auth.currentUser;
       if (user == null) {
@@ -145,11 +124,7 @@ class _HomeScreenState extends State<HomeScreen> {
           _userRole = fetchedRole;
           _isLoadingProfile = false;
         });
-        // This print is safe here because it's after `await` and within the async method, not directly in initState's sync part.
-        print("[HomeScreen _fetchProfile] Profile fetched. Role: $_userRole. Current Route from _fetchProfile: ${ModalRoute.of(context)?.settings.name}");
-        // NO automatic redirect to /app_management from here.
-        // InitialAuthCheckScreen handles primary routing for app start.
-        // If an admin is on /home, it's because they chose to be (User Mode).
+        print("[HomeScreen _fetchProfile] Profile fetched. Role: $_userRole. Current Route: ${ModalRoute.of(context)?.settings.name}");
       }
     } catch (e, s) {
       print("HomeScreen: Error fetching profile: $e\n$s");
@@ -181,36 +156,46 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  Future<void> _fetchBetslips() async {
+  Future<void> _fetchBetslips() async { // Fetches ALL betslips
     if (!mounted) return;
-    if (mounted) setState(() => _isLoadingBetslips = true);
+    setState(() => _isLoadingBetslips = true);
     try {
       final data = await supabase.from('betslips').select().order('created_at', ascending: false);
       final List<Betslip> slips = data.map((item) {
         if (item is Map<String, dynamic>) return Betslip.fromJson(item);
         return null;
       }).whereType<Betslip>().toList();
-      if (mounted) setState(() { _allBetslips = slips; _isLoadingBetslips = false; _applyDateFilter(); });
+      if (mounted) {
+        setState(() {
+          _allBetslips = slips; // Store all slips
+          _isLoadingBetslips = false;
+          _applyDateFilter(); // This will filter for REGULAR slips to display in main feed
+        });
+      }
     } catch (e, s) {
       print("HomeScreen: Error fetching betslips: $e\n$s");
       if (mounted) {
-        setState(() { _isLoadingBetslips = false; _allBetslips = []; _filteredBetslips = []; });
+        setState(() { _isLoadingBetslips = false; _allBetslips = []; _filteredRegularSlips = []; });
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error fetching betslips: ${e.toString()}'), backgroundColor: Theme.of(context).colorScheme.error));
       }
     }
   }
 
-  void _applyDateFilter() {
+  void _applyDateFilter() { // Filters for REGULAR (non-premium) slips for the main feed
     if (_allBetslips == null) {
-      if (mounted) setState(() => _filteredBetslips = []);
+      if (mounted) setState(() => _filteredRegularSlips = []);
       return;
     }
-    _filteredBetslips = _allBetslips!.where((slip) {
+    // Filter for non-premium slips based on the selected date
+    _filteredRegularSlips = _allBetslips!.where((slip) {
+      if (slip.isPremium) return false; // Exclude premium slips from this list
       if (slip.createdAt == null) return false;
       final createdAtDate = DateTime(slip.createdAt!.year, slip.createdAt!.month, slip.createdAt!.day);
       return createdAtDate.isAtSameMomentAs(_selectedFilterDate);
     }).toList();
-    _filteredBetslips?.sort((a, b) {
+
+    // Sort the filtered regular slips
+    _filteredRegularSlips?.sort((a, b) {
       bool aIsValid = a.validUntil != null && a.validUntil!.isAfter(DateTime.now());
       bool bIsValid = b.validUntil != null && b.validUntil!.isAfter(DateTime.now());
       if (aIsValid && !bIsValid) return -1;
@@ -227,7 +212,7 @@ class _HomeScreenState extends State<HomeScreen> {
       return;
     }
     await _fetchUserPurchases();
-    await _fetchBetslips();
+    await _fetchBetslips(); // Re-fetches all, then _applyDateFilter separates them
     if (mounted) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) _scrollToSelectedDate();
@@ -280,14 +265,17 @@ class _HomeScreenState extends State<HomeScreen> {
     return DateFormat('EEE, d MMM').format(date);
   }
 
+  void _navigateToPremiumPackages() {
+    Navigator.push(context, MaterialPageRoute(builder: (_) => const PremiumSlipsScreen()));
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final todayForLabel = DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
-
-    // This print is safe as it's in the build method.
     final currentRouteName = ModalRoute.of(context)?.settings.name;
-    print("[HomeScreen Build] Building UI. Role: $_userRole, Current Route from Build: $currentRouteName");
+
+    print("[HomeScreen Build] Building UI. Role: $_userRole, Current Route: $currentRouteName");
 
     if (_isLoadingProfile || (_userRole == null && supabase.auth.currentSession != null)) {
       print("[HomeScreen Build] Initial Profile Loading State in build.");
@@ -299,11 +287,24 @@ class _HomeScreenState extends State<HomeScreen> {
       return const Scaffold(body: Center(child: CircularProgressIndicator(key: ValueKey("HomeScreenAdminNotHomeRouteLoadingBuild"))));
     }
 
-    final bool stillLoadingBetslipData = _isLoadingBetslips || _isLoadingPurchases;
+    final bool stillLoadingBetslipData = _isLoadingBetslips || _isLoadingPurchases; // Check if betslip specific data is loading
 
     return Scaffold(
       key: _scaffoldKey,
-      appBar: AppBar(title: const Text("BetCrack Feed")),
+      appBar: AppBar(
+        title: const Text("BetCrack Feed"),
+        actions: [
+          TextButton.icon(
+            onPressed: _navigateToPremiumPackages,
+            icon: Icon(Icons.star_purple500_outlined, color: theme.colorScheme.onPrimary),
+            label: Text("Premium", style: TextStyle(color: theme.colorScheme.onPrimary, fontWeight: FontWeight.w600)),
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+            ),
+          ),
+          const SizedBox(width: 8),
+        ],
+      ),
       drawer: AppDrawer(
         username: _username,
         phone: _phone,
@@ -328,6 +329,7 @@ class _HomeScreenState extends State<HomeScreen> {
       body: SafeArea(
         child: Column(
           children: [
+            // Date Filter Chips for Regular Slips
             Container(
               padding: const EdgeInsets.symmetric(vertical: 8.0),
               color: ElevationOverlay.applySurfaceTint(theme.colorScheme.surface, theme.colorScheme.surfaceTint, 1.5),
@@ -366,22 +368,27 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
             const Divider(height: 1, thickness: 0.5),
+
+            // List of REGULAR Betslips
             Expanded(
               child: stillLoadingBetslipData
-                  ? const Center(child: CircularProgressIndicator(key: ValueKey("HomeScreenBetslipDataLoadingBuild")))
-                  : _allBetslips == null
+                  ? const Center(child: CircularProgressIndicator(key: ValueKey("HomeScreenRegularSlipsLoading")))
+                  : _allBetslips == null // This implies an error fetching any slips
                   ? _buildErrorState(theme, "Could not load betslips.", "Please check your internet connection.")
-                  : (_filteredBetslips == null || _filteredBetslips!.isEmpty)
-                  ? _buildEmptyState(theme, todayForLabel)
+                  : (_filteredRegularSlips == null || _filteredRegularSlips!.isEmpty)
+                  ? _buildEmptyState(theme, todayForLabel) // Empty state specifically for regular slips
                   : RefreshIndicator(
                 onRefresh: _refreshData,
                 color: theme.colorScheme.primary,
                 backgroundColor: theme.colorScheme.surface,
                 child: ListView.builder(
-                  padding: const EdgeInsets.only(top: 8.0, bottom: 16.0),
-                  itemCount: _filteredBetslips!.length,
+                  padding: const EdgeInsets.only(top: 8.0, bottom: 80.0), // Padding for FAB if any, or general spacing
+                  itemCount: _filteredRegularSlips!.length,
                   itemBuilder: (context, index) {
-                    final slip = _filteredBetslips![index];
+                    final slip = _filteredRegularSlips![index];
+                    // Ensure we are not accidentally showing a premium slip here
+                    if (slip.isPremium) return const SizedBox.shrink(); // Should not happen due to filter
+
                     final isUserPurchasedThisSlip = _purchaseStatus[slip.id] ?? false;
                     return BetslipCard(
                       betslip: slip,
@@ -425,32 +432,53 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildEmptyState(ThemeData theme, DateTime todayForLabel) {
+    String message = "No regular tips for ${_getFilterDateLabel(_selectedFilterDate, todayForLabel)}.";
+    if (_allBetslips?.where((s) => !s.isPremium).isEmpty ?? true) {
+      message = "No regular tips posted yet.";
+    }
+
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(20.0),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.event_busy_outlined, color: theme.colorScheme.secondary, size: 60),
+            Icon(Icons.event_note_outlined, color: theme.colorScheme.secondary, size: 60), // Changed icon
             const SizedBox(height: 16),
             Text(
-              _allBetslips?.isEmpty ?? true ? "No Tips Posted Yet!" : "No Tips for ${_getFilterDateLabel(_selectedFilterDate, todayForLabel)}",
+              message,
               style: theme.textTheme.headlineSmall,
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 8),
             Text(
-              _allBetslips?.isEmpty ?? true ? "Check back soon for the latest tips." : "Check other dates or refresh the feed.",
+              _allBetslips?.where((s) => !s.isPremium).isEmpty ?? true
+                  ? "Check back soon or explore Premium Packages!"
+                  : "Try other dates or check out Premium Packages.",
               textAlign: TextAlign.center,
               style: theme.textTheme.bodyLarge?.copyWith(color: theme.colorScheme.onSurfaceVariant),
             ),
-            const SizedBox(height: 20),
-            ElevatedButton.icon(
-              icon: const Icon(Icons.refresh_rounded),
-              label: Text(_allBetslips?.isEmpty ?? true ? "Refresh Feed" : "Refresh All"),
-              onPressed: _refreshData,
-              style: ElevatedButton.styleFrom(backgroundColor: theme.colorScheme.secondary, foregroundColor: theme.colorScheme.onSecondary),
-            )
+            const SizedBox(height: 24),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                ElevatedButton.icon(
+                  icon: const Icon(Icons.refresh_rounded),
+                  label: const Text("Refresh Feed"),
+                  onPressed: _refreshData,
+                ),
+                const SizedBox(width: 12),
+                ElevatedButton.icon(
+                  icon: Icon(Icons.star_purple500_outlined, color: theme.colorScheme.onPrimaryContainer),
+                  label: Text("Premium Tips", style: TextStyle(color: theme.colorScheme.onPrimaryContainer)),
+                  onPressed: _navigateToPremiumPackages,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: theme.colorScheme.primaryContainer,
+                    foregroundColor: theme.colorScheme.onPrimaryContainer,
+                  ),
+                )
+              ],
+            ),
           ],
         ),
       ),

@@ -1,4 +1,5 @@
 // lib/models/betslip.dart
+import 'package:intl/intl.dart';
 
 class Betslip {
   final String id;
@@ -6,59 +7,123 @@ class Betslip {
   final String imageUrl;
   final bool isPaid;
   final int price;
+  final String? postedBy;
   final DateTime? createdAt;
   final String? bookingCode;
-
-  // New fields
   final DateTime? validUntil;
   final String? odds;
   final String? companyName;
-  final DateTime? autoUnlockAt; // For client-side logic to treat as free after this time
+  final DateTime? autoUnlockAt; // Used for both regular paid and premium
+
+  final bool isPremium;
+  final int packagePrice;
+  final int refundAmountIfLost;
+  final int refundPercentageBonus;
 
   Betslip({
     required this.id,
     required this.title,
     required this.imageUrl,
-    required this.isPaid,
-    required this.price,
+    this.isPaid = false,
+    this.price = 0,
+    this.postedBy,
     this.createdAt,
     this.bookingCode,
-    // New fields
     this.validUntil,
     this.odds,
     this.companyName,
-    this.autoUnlockAt,
+    this.autoUnlockAt, // Initialize this
+    this.isPremium = false,
+    this.packagePrice = 0,
+    this.refundAmountIfLost = 0,
+    this.refundPercentageBonus = 0,
   });
 
   factory Betslip.fromJson(Map<String, dynamic> json) {
     return Betslip(
-      id: json['id'] as String? ?? '',
-      title: json['title'] as String? ?? 'No Title',
-      imageUrl: json['image_url'] as String? ?? '',
+      id: json['id'] as String,
+      title: json['title'] as String,
+      imageUrl: json['image_url'] as String,
       isPaid: json['is_paid'] as bool? ?? false,
       price: json['price'] as int? ?? 0,
-      createdAt: json['created_at'] != null
-          ? DateTime.tryParse(json['created_at'] as String? ?? '')
-          : null,
+      postedBy: json['posted_by'] as String?,
+      createdAt: json['created_at'] == null
+          ? null
+          : DateTime.parse(json['created_at'] as String),
       bookingCode: json['booking_code'] as String?,
-      // New fields
-      validUntil: json['valid_until'] != null
-          ? DateTime.tryParse(json['valid_until'] as String? ?? '')
-          : null,
+      validUntil: json['valid_until'] == null
+          ? null
+          : DateTime.parse(json['valid_until'] as String),
       odds: json['odds'] as String?,
       companyName: json['company_name'] as String?,
-      autoUnlockAt: json['auto_unlock_at'] != null
-          ? DateTime.tryParse(json['auto_unlock_at'] as String? ?? '')
-          : null,
+      autoUnlockAt: json['auto_unlock_at'] == null // Parse this
+          ? null
+          : DateTime.parse(json['auto_unlock_at'] as String),
+      isPremium: json['is_premium'] as bool? ?? false,
+      packagePrice: json['package_price'] as int? ?? 0,
+      refundAmountIfLost: json['refund_amount_if_lost'] as int? ?? 0,
+      refundPercentageBonus: json['refund_percentage_bonus'] as int? ?? 0,
     );
   }
 
-  // Helper to determine if the slip should be considered effectively free based on autoUnlockAt
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'title': title,
+    'image_url': imageUrl,
+    'is_paid': isPaid,
+    'price': price, // For regular slips, or base price if premium also uses it
+    'posted_by': postedBy,
+    'created_at': createdAt?.toIso8601String(),
+    'booking_code': bookingCode,
+    'valid_until': validUntil?.toIso8601String(),
+    'odds': odds,
+    'company_name': companyName,
+    'auto_unlock_at': autoUnlockAt?.toIso8601String(), // Serialize this
+    'is_premium': isPremium,
+    'package_price': packagePrice,
+    'refund_amount_if_lost': refundAmountIfLost,
+    'refund_percentage_bonus': refundPercentageBonus,
+  };
+
+  bool get isExpired {
+    return validUntil != null && validUntil!.isBefore(DateTime.now());
+  }
+
   bool get isEffectivelyFreeNow {
-    if (!isPaid) return true; // Already free
-    if (autoUnlockAt != null && DateTime.now().isAfter(autoUnlockAt!)) {
-      return true; // Auto-unlock time has passed
+    // A slip is effectively free if:
+    // 1. It was never paid/premium to begin with.
+    // 2. Or, it was paid (regular or premium) AND its autoUnlockAt time has passed.
+    if (!isPaid && !isPremium) return true;
+    if (autoUnlockAt != null && autoUnlockAt!.isBefore(DateTime.now())) {
+      return true;
     }
-    return false; // Still paid and locked (or no auto-unlock time)
+    return false;
+  }
+
+  double get calculatedTotalRefund {
+    if (!isPremium) return 0;
+    double bonusAmount = refundAmountIfLost * (refundPercentageBonus / 100.0);
+    return refundAmountIfLost + bonusAmount;
+  }
+
+  String get formattedCalculatedTotalRefund {
+    final currencyFormat = NumberFormat.currency(locale: 'en_TZ', symbol: 'TZS ', decimalDigits: 0);
+    return currencyFormat.format(calculatedTotalRefund);
+  }
+
+  String get formattedPackagePrice {
+    final currencyFormat = NumberFormat.currency(locale: 'en_TZ', symbol: 'TZS ', decimalDigits: 0);
+    return currencyFormat.format(packagePrice);
+  }
+
+  String get formattedPrice { // For regular paid slips
+    final currencyFormat = NumberFormat.currency(locale: 'en_TZ', symbol: 'TZS ', decimalDigits: 0);
+    return currencyFormat.format(price);
+  }
+
+  String get formattedRefundAmountIfLost {
+    final currencyFormat = NumberFormat.currency(locale: 'en_TZ', symbol: 'TZS ', decimalDigits: 0);
+    return currencyFormat.format(refundAmountIfLost);
   }
 }
+
