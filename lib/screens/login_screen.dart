@@ -1,15 +1,17 @@
-// lib/screens/login_screen.dart
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/auth_service.dart';
 import 'signup_screen.dart';
 import 'home_screen.dart';
-import '../admin/app_management_screen.dart'; // Corrected import for admin panel
+import '../admin/app_management_screen.dart'; // Ensure this path is correct
 import '../widgets/custom_input.dart';
 import '../widgets/custom_button.dart';
+import 'forgot_password_phone_screen.dart';
 
 class LoginScreen extends StatefulWidget {
+  static const String routeName = '/login'; // This one is fine for LoginScreen itself
+
   const LoginScreen({super.key});
 
   @override
@@ -17,11 +19,11 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final _auth = AuthService();
+  final _authService = AuthService();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _supabase = Supabase.instance.client;
-  final _formKey = GlobalKey<FormState>(); // For form validation
+  final _formKey = GlobalKey<FormState>();
 
   bool _isLoading = false;
 
@@ -31,26 +33,26 @@ class _LoginScreenState extends State<LoginScreen> {
           .from('profiles')
           .select('role')
           .eq('id', userId)
-          .single(); // Use .single() as ID should be unique
+          .single();
       return response['role'] as String?;
     } catch (e) {
       print("Error fetching role from profile: $e");
       if (mounted) {
         Fluttertoast.showToast(msg: "Could not verify user role.");
       }
-      return null; // Return null on error
+      return null;
     }
   }
 
   Future<void> _login() async {
-    if (!_formKey.currentState!.validate()) { // Validate the form
+    if (!_formKey.currentState!.validate()) {
       return;
     }
     if (_isLoading) return;
     setState(() => _isLoading = true);
 
     try {
-      final AuthResponse res = await _auth.signIn(
+      final AuthResponse res = await _authService.signIn(
         _emailController.text.trim(),
         _passwordController.text,
       );
@@ -63,24 +65,27 @@ class _LoginScreenState extends State<LoginScreen> {
         if (userRole == 'super_admin') {
           Navigator.pushReplacement(
             context,
-            MaterialPageRoute(builder: (_) => const AppManagementScreen(), settings: const RouteSettings(name: '/app_management')), // Navigate admin to AppManagementScreen
+            MaterialPageRoute(
+              builder: (_) => const AppManagementScreen(),
+              // Removed RouteSettings or ensure AppManagementScreen has routeName if you need it
+            ),
           );
-        } else if (userRole != null) { // Could be 'user' or any other non-admin role
+        } else {
           Navigator.pushReplacement(
             context,
-            MaterialPageRoute(builder: (_) => const HomeScreen(), settings: const RouteSettings(name: '/home')),
+            MaterialPageRoute(
+              builder: (_) => const HomeScreen(),
+              // Removed RouteSettings or ensure HomeScreen has routeName if you need it
+            ),
           );
-        } else { // Role not found or null, default to home
-          Fluttertoast.showToast(msg: "Role not found. Defaulting to Home.");
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (_) => const HomeScreen(), settings: const RouteSettings(name: '/home')),
-          );
+          if (userRole == null) {
+            Fluttertoast.showToast(msg: "Role not found. Defaulting to Home.");
+          }
         }
       } else {
-        // This case should ideally be handled by AuthException if Supabase returns an error
         if (mounted) {
-          Fluttertoast.showToast(msg: "Login failed: User not found or invalid credentials.");
+          Fluttertoast.showToast(
+              msg: "Login failed: User not found or invalid credentials.");
         }
       }
     } on AuthException catch (e) {
@@ -90,7 +95,8 @@ class _LoginScreenState extends State<LoginScreen> {
     } catch (e, s) {
       print("Unexpected error during login: $e\n$s");
       if (mounted) {
-        Fluttertoast.showToast(msg: "An unexpected error occurred. Please try again.");
+        Fluttertoast.showToast(
+            msg: "An unexpected error occurred. Please try again.");
       }
     } finally {
       if (mounted) {
@@ -113,7 +119,7 @@ class _LoginScreenState extends State<LoginScreen> {
       body: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24.0),
-          child: Form( // Added Form widget
+          child: Form(
             key: _formKey,
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -142,7 +148,8 @@ class _LoginScreenState extends State<LoginScreen> {
                     if (value == null || value.isEmpty) {
                       return 'Please enter your email';
                     }
-                    if (!value.contains('@') || !value.contains('.')) {
+                    // Using a more common regex for basic email validation
+                    if (!RegExp(r"^[a-zA-Z0-9.a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9]+\.[a-zA-Z]+").hasMatch(value)) {
                       return 'Please enter a valid email';
                     }
                     return null;
@@ -178,13 +185,36 @@ class _LoginScreenState extends State<LoginScreen> {
                     Text("Don't have an account?", style: theme.textTheme.bodyMedium),
                     CustomButton(
                       label: "Sign Up",
-                      onPressed: _isLoading ? null : () => Navigator.pushReplacement(
+                      onPressed: _isLoading
+                          ? null
+                          : () => Navigator.pushReplacement(
                         context,
-                        MaterialPageRoute(builder: (_) => const SignupScreen()),
+                        MaterialPageRoute(
+                          builder: (_) => const SignupScreen(),
+                          // Removed RouteSettings or ensure SignupScreen has routeName if you need it
+                        ),
                       ),
-                      type: CustomButtonType.text, // Ensure CustomButton handles this type
+                      type: CustomButtonType.text,
                     ),
                   ],
+                ),
+                const SizedBox(height: 8),
+                TextButton(
+                  onPressed: _isLoading
+                      ? null
+                      : () {
+                    Navigator.push( // Using push for ForgotPassword, as it's not a replacement
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const ForgotPasswordPhoneScreen(),
+                        // No RouteSettings here unless ForgotPasswordPhoneScreen explicitly defines and uses its routeName for specific purposes
+                      ),
+                    );
+                  },
+                  child: Text(
+                    'Forgot Password?',
+                    style: TextStyle(color: theme.colorScheme.secondary),
+                  ),
                 ),
               ],
             ),
@@ -194,3 +224,4 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 }
+

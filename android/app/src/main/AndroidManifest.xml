@@ -1,25 +1,89 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- THIS IS THE CORRECT PLACEMENT FOR INTERNET PERMISSION -->
+    <!-- Permissions: Only request what your app truly needs. -->
     <uses-permission android:name="android.permission.INTERNET"/>
+    <!--
+        If you are using image_picker to pick from the gallery, you usually DO NOT need
+        READ_EXTERNAL_STORAGE or WRITE_EXTERNAL_STORAGE for Android 10+ due to Scoped Storage.
+        The plugin handles access via the system picker.
+        Only add these if you have other specific needs for broad file system access.
+    -->
+    <!-- <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="28" /> -->
+    <!-- <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" /> -->
+
+
+    <!--
+         The <queries> element allows your app to discover other apps on the device,
+         necessary for functionalities like url_launcher.
+    -->
+    <queries>
+        <!-- For launching telephone dialer -->
+        <intent>
+            <action android:name="android.intent.action.DIAL" />
+            <data android:scheme="tel" />
+        </intent>
+        <!-- For launching SMS -->
+        <intent>
+            <action android:name="android.intent.action.SENDTO" />
+            <data android:scheme="smsto" />
+        </intent>
+        <!-- For launching web URLs (e.g., for banners or external links) -->
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="https" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="http" />
+        </intent>
+        <!-- For ACTION_PROCESS_TEXT (often added by default or by plugins) -->
+        <intent>
+            <action android:name="android.intent.action.PROCESS_TEXT"/>
+            <data android:mimeType="text/plain"/>
+        </intent>
+        <!-- If you use url_launcher to open WhatsApp via wa.me links, HTTPS query is enough. -->
+        <!-- If you need to query WhatsApp directly (less common): -->
+        <!--
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="whatsapp" />
+        </intent>
+        -->
+    </queries>
 
     <application
         android:label="betcrack"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <!--
-        <uses-permission android:name="android.permission.INTERNET"/>
-        THIS WAS THE INCORRECT PLACEMENT
+            android:requestLegacyExternalStorage="true" is generally not needed or recommended
+            for apps targeting Android 11+ unless you have a very specific legacy use case
+            that cannot be met by Scoped Storage or MANAGE_EXTERNAL_STORAGE (which is hard to get).
+            Remove it if image_picker is your primary use for storage access.
         -->
+        {/* android:requestLegacyExternalStorage="true" */}
+
+        {/*
+        android:usesCleartextTraffic="true"
+        This should ONLY be used if you absolutely need to load HTTP (non-secure)
+        content from network resources (e.g., banner images from an HTTP URL).
+        It's a security risk. Prefer HTTPS for all network requests.
+        If you only need it for specific domains during development, use a network_security_config.xml file.
+        For production, try to ensure all banner images are served over HTTPS.
+        If some banners *must* be HTTP, you might need this, but be aware of the implications.
+        */}
+        <!-- <application android:usesCleartextTraffic="true" ... > -->
+
+
         <activity
             android:name=".MainActivity"
             android:exported="true"
             android:launchMode="singleTop"
-            android:taskAffinity=""
             android:theme="@style/LaunchTheme"
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
             android:hardwareAccelerated="true"
             android:windowSoftInputMode="adjustResize">
+
             <!-- Specifies an Android theme to apply to this Activity as soon as
                  the Android process has started. This theme is visible to the user
                  while the Flutter UI initializes. After that, this theme continues
@@ -28,26 +92,32 @@
                 android:name="io.flutter.embedding.android.NormalTheme"
                 android:resource="@style/NormalTheme"
                 />
+
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
+
+            <!--
+                IF YOU USE SUPABASE EMAIL AUTH LINKS (PASSWORD RESET, MAGIC LINKS, INVITES)
+                THAT REDIRECT TO YOUR APP VIA A CUSTOM SCHEME, ADD INTENT FILTERS HERE.
+                Example for scheme "betcrackapp" and host "auth-callback":
+
+            <intent-filter android:autoVerify="false">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="betcrackapp" android:host="auth-callback" />
+            </intent-filter>
+            -->
+
         </activity>
+
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
     </application>
-    <!-- Required to query activities that can process text, see:
-         https://developer.android.com/training/package-visibility and
-         https://developer.android.com/reference/android/content/Intent#ACTION_PROCESS_TEXT.
 
-         In particular, this is used by the Flutter engine in io.flutter.plugin.text.ProcessTextPlugin. -->
-    <queries>
-        <intent>
-            <action android:name="android.intent.action.PROCESS_TEXT"/>
-            <data android:mimeType="text/plain"/>
-        </intent>
-    </queries>
 </manifest>

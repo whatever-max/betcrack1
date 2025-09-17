@@ -19,30 +19,26 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 version: 1.0.0+1
 
 environment:
-  sdk: ^3.9.2
+  sdk: ^3.9.2 # Your original SDK constraint
 
-# Dependencies specify other packages that your package needs in order to work.
-# To automatically upgrade your package dependencies to the latest versions
-# consider running `flutter pub upgrade --major-versions`. Alternatively,
-# dependencies can be manually updated by changing the version numbers below to
-# the latest version available on pub.dev. To see which dependencies have newer
-# versions available, run `flutter pub outdated`.
-dependencies:
+dependencies: # Your original dependencies block
   flutter:
     sdk: flutter
 
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
-  supabase_flutter: ^2.10.0
+  supabase_flutter: ^2.10.1
   flutter_spinkit: ^5.2.0
   google_fonts: ^6.1.0
-  fluttertoast: ^8.2.2
+  fluttertoast: ^8.2.2 # Your original fluttertoast version
   image_picker: ^1.2.0
   uuid: ^4.5.1
-  intl: ^0.18.1
+  intl: ^0.20.2
+  url_launcher: ^6.3.0
+  photo_view: ^0.15.0
 
-dev_dependencies:
+dev_dependencies: # Your original dev_dependencies block
   flutter_test:
     sdk: flutter
 
@@ -51,13 +47,41 @@ dev_dependencies:
   # activated in the `analysis_options.yaml` file located at the root of your
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
-  flutter_lints: ^5.0.0
+  flutter_lints: ^6.0.0 # Your original flutter_lints version
+
+  # ADDED: flutter_launcher_icons dependency (This line was correctly added in a previous step)
+  flutter_launcher_icons: ^0.14.4
+  # REMOVED: flutter_native_splash dependency
+  # flutter_native_splash: ^2.4.0
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
 
+# ADDED: Top-level configuration for flutter_launcher_icons (This block was correctly added)
+# This integrates the settings you had previously under the 'flutter' key
+# and places them correctly as a top-level configuration block.
+flutter_launcher_icons:
+  android: true # Assuming you want Android icons
+  ios: true     # Assuming you want iOS icons
+  image_path: "assets/icon/BetCrack.png" # Your main icon path
+  adaptive_icon_background: "#000000"  # Your specified background
+  # MODIFIED: Use your existing BetCrack.png for the adaptive foreground
+  adaptive_icon_foreground: "assets/icon/BetCrack.png" # Your specified foreground (NOW POINTING TO YOUR EXISTING ICON)
+  # You can add other flutter_launcher_icons options here if needed, like:
+  # min_sdk_android: 21
+  # remove_alpha_ios: true
+
+# REMOVED: Top-level configuration for flutter_native_splash
+# flutter_native_splash:
+#   color: "#00695C"
+#   image: "assets/images/splash.jpg"
+#   android_gravity: fill
+#   ios_content_mode: scaleAspectFill
+#   android_12:
+#     image: "assets/images/splash.jpg"
+
 # The following section is specific to Flutter packages.
-flutter:
+flutter: # Your original flutter block
 
   # The following line ensures that the Material Icons font is
   # included with your application, so that you can use the icons in
@@ -65,9 +89,22 @@ flutter:
   uses-material-design: true
 
   # To add assets to your application, add an assets section, like this:
-  # assets:
+  assets: # Your original assets block, with icon paths added/modified if not already present
+    # Make sure these paths are correct and the files exist in your project.
+    - assets/icon/BetCrack.png # Path to your main app icon/logo
+    - assets/images/splash.jpg # Your splash screen image (can keep if you might use it later in Flutter)
+
   #   - images/a_dot_burr.jpeg
   #   - images/a_dot_ham.jpeg
+  #
+  # Note: The lines you had here previously: (This comment block is from a previous iteration by me, kept for context of the change)
+  #   - image_path: "assets/icon/BetCrack.png"
+  #   adaptive_icon_background: "#000000"
+  #   adaptive_icon_foreground: "assets/icon/app_icon.png"
+  # were part of the flutter_launcher_icons configuration but were misplaced.
+  # They are now correctly under the top-level 'flutter_launcher_icons:' block.
+  # The actual asset file paths need to be listed directly under 'assets:' like above.
+
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

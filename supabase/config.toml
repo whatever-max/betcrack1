@@ -1,0 +1,19 @@
+# Supabase Configuration
+
+project_id = "ptkdfuxoiupkmprpafcp"
+
+[api]
+port = 54321
+
+[db]
+port = 54322
+
+[studio]
+port = 54323
+
+[auth]
+site_url = "http://localhost:3000"
+enable_signup = true
+
+[inbucket]
+port = 54324
