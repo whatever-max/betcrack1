@@ -81,7 +81,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             onTap: () {
               // TODO: Navigate to Profile Screen or Profile Edit Screen
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Profile screen not implemented yet.')),
+                const SnackBar(content: Text('Profile screen comming soon !')),
               );
             },
           ),
@@ -113,7 +113,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             onTap: () {
               // TODO: Implement theme switching logic (e.g., using a ThemeProvider)
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Theme switching not implemented yet.')),
+                const SnackBar(content: Text('Theme switching comming soon!.')),
               );
             },
           ),
@@ -127,11 +127,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 context: context,
                 applicationName: 'BetCrack',
                 applicationVersion: '1.0.0', // Replace with your actual version
-                applicationLegalese: '©2023 Your Company Name', // Replace
+                applicationLegalese: '©2025 BetCrack Company ', // Replace
                 children: <Widget>[
                   const Padding(
                     padding: EdgeInsets.only(top: 15),
-                    child: Text('Your go-to app for amazing tips!'), // Replace
+                    child: Text(' App for amazing tips!'), // Replace
                   )
                 ],
               );
